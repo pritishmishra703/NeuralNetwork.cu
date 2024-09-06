@@ -4,71 +4,80 @@
 #include <vector>
 #include <algorithm>
 
-#define BATCH_SIZE 4
+// Structure to hold our dataset
+struct Dataset {
+    std::vector<std::vector<float>> X;
+    std::vector<float> y;
+};
 
-std::vector<std::string> split(const std::string& str, char delimiter) {
-    std::vector<std::string> tokens;
-    std::string token;
-    std::istringstream tokenStream(str);
-    while (std::getline(tokenStream, token, delimiter)) {
-        tokens.push_back(token);
-    }
-    return tokens;
-}
-
-void loadCSV(const std::string& filename, std::vector<std::vector<float>>& X, std::vector<float>& Y) {
+// Function to load CSV file
+Dataset loadCSV(const std::string& filename) {
+    Dataset data;
     std::ifstream file(filename);
     std::string line;
-    
+
     while (std::getline(file, line)) {
-        std::vector<std::string> tokens = split(line, ',');
-        std::vector<float> x_row;
-        
-        for (size_t i = 0; i < tokens.size() - 1; ++i) {
-            x_row.push_back(std::stof(tokens[i]));
+        std::istringstream iss(line);
+        std::string value;
+        std::vector<float> row;
+
+        while (std::getline(iss, value, ',')) {
+            row.push_back(std::stof(value));
         }
-        
-        X.push_back(x_row);
-        Y.push_back(std::stof(tokens.back()));
+
+        // Last column is y, rest are X
+        data.y.push_back(row.back());
+        row.pop_back();
+        data.X.push_back(row);
     }
+
+    return data;
 }
 
-void createBatches(const std::vector<std::vector<float>>& X, const std::vector<float>& Y, int batchSize) {
-    size_t total_samples = X.size();
-    
-    for (size_t i = 0; i < total_samples; i += batchSize) {
-        size_t batch_end = std::min(i + batchSize, total_samples);
+// Function to create batches
+std::vector<Dataset> createBatches(const Dataset& data, int batchSize) {
+    std::vector<Dataset> batches;
+    int numSamples = data.X.size();
+    int numBatches = (numSamples + batchSize - 1) / batchSize;
 
-        std::cout << "Batch from index " << i << " to " << batch_end - 1 << std::endl;
-        std::cout << "X Batch:" << std::endl;
-        for (size_t j = i; j < batch_end; ++j) {
-            for (float val : X[j]) {
+    for (int i = 0; i < numBatches; ++i) {
+        Dataset batch;
+        int start = i * batchSize;
+        int end = std::min(start + batchSize, numSamples);
+
+        batch.X.assign(data.X.begin() + start, data.X.begin() + end);
+        batch.y.assign(data.y.begin() + start, data.y.begin() + end);
+
+        batches.push_back(batch);
+    }
+
+    return batches;
+}
+
+// Function to print batches (for debugging)
+void printBatches(const std::vector<Dataset>& batches) {
+    for (size_t i = 0; i < batches.size(); ++i) {
+        std::cout << "Batch " << i + 1 << ":\n";
+        for (size_t j = 0; j < batches[i].X.size(); ++j) {
+            std::cout << "  Sample " << j + 1 << ": ";
+            for (float val : batches[i].X[j]) {
                 std::cout << val << " ";
             }
-            std::cout << std::endl;
+            std::cout << "| " << batches[i].y[j] << "\n";
         }
-        std::cout << "Y Batch:" << std::endl;
-        for (size_t j = i; j < batch_end; ++j) {
-            std::cout << Y[j] << " ";
-        }
-        std::cout << std::endl;
+        std::cout << "\n";
     }
 }
 
 int main() {
-    std::vector<std::vector<float>> X;
-    std::vector<float> Y;
-    
-    // Load CSV
-    loadCSV("data/sample.csv", X, Y);
+    // Load the CSV file
+    Dataset data = loadCSV("data/sample.csv");
 
-    // Print the data for debugging
-    std::cout << "Loaded data successfully." << std::endl;
-    std::cout << "Total samples: " << X.size() << std::endl;
-    std::cout << "Creating batches of size: " << BATCH_SIZE << std::endl;
+    // Create batches
+    std::vector<Dataset> batches = createBatches(data, 3); // Batch size of 32
 
-    // Create and print batches
-    createBatches(X, Y, BATCH_SIZE);
-    
+    // Print batches for debugging
+    printBatches(batches);
+
     return 0;
 }
